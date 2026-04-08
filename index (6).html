@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MediEdge — On-Device X-ray AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --navy:   #060D1F;
+  --dark:   #0A1628;
+  --mid:    #0E2040;
+  --blue:   #1565C0;
+  --lblue:  #1E88E5;
+  --cyan:   #00C8D7;
+  --teal:   #00897B;
+  --gold:   #F9A825;
+  --amber:  #FF8F00;
+  --green:  #2E7D32;
+  --lgreen: #43A047;
+  --white:  #FFFFFF;
+  --cream:  #F0F6FF;
+  --gray:   #8EAAC8;
+  --qual:   #3253DC;
+  --shadow: 0 20px 60px rgba(0,0,0,0.35);
+  --shadow-sm: 0 6px 24px rgba(0,0,0,0.2);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--navy);
+  color: var(--white);
+  overflow-x: hidden;
+}
+
+/* ── NOISE TEXTURE OVERLAY ── */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  opacity: 0.4;
+}
+
+/* ── NAV ── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  padding: 1.2rem 5%;
+  display: flex; align-items: center; justify-content: space-between;
+  background: rgba(6,13,31,0.85);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(0,200,215,0.12);
+  transition: all 0.3s;
+}
+.nav-logo {
+  font-family: 'Inter', sans-serif;
+  font-size: 1.4rem; font-weight: 800;
+  color: var(--white); letter-spacing: -0.01em;
+}
+.nav-logo span { color: var(--cyan); }
+.nav-links { display: flex; gap: 2rem; list-style: none; }
+.nav-links a {
+  text-decoration: none; color: var(--gray);
+  font-size: 0.88rem; font-weight: 500;
+  transition: color 0.2s;
+}
+.nav-links a:hover { color: var(--cyan); }
+.nav-lang { display: flex; gap: 0.4rem; }
+.lang-btn {
+  padding: 0.3rem 0.7rem;
+  border: 1.5px solid rgba(0,200,215,0.3);
+  border-radius: 20px; background: none;
+  font-size: 0.78rem; font-weight: 600;
+  cursor: pointer; transition: all 0.2s;
+  color: var(--gray); font-family: 'Inter', sans-serif;
+}
+.lang-btn.active, .lang-btn:hover {
+  border-color: var(--cyan); color: var(--cyan);
+  background: rgba(0,200,215,0.08);
+}
+.nav-cta {
+  padding: 0.55rem 1.3rem;
+  background: var(--cyan); color: var(--navy);
+  border: none; border-radius: 6px;
+  font-size: 0.85rem; font-weight: 700;
+  cursor: pointer; transition: all 0.25s;
+  font-family: 'Inter', sans-serif;
+}
+.nav-cta:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,200,215,0.4); }
+
+/* ── HERO ── */
+#hero {
+  min-height: 100vh;
+  display: flex; align-items: center;
+  padding: 7rem 5% 4rem;
+  position: relative; overflow: hidden;
+}
+.hero-glow {
+  position: absolute; border-radius: 50%;
+  filter: blur(120px); opacity: 0.15; pointer-events: none;
+}
+.glow-1 { width: 700px; height: 700px; background: var(--cyan); top: -200px; right: -200px; }
+.glow-2 { width: 500px; height: 500px; background: var(--blue); bottom: -100px; left: -100px; }
+.hero-content { position: relative; z-index: 1; max-width: 680px; }
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  padding: 0.4rem 1rem;
+  background: rgba(0,200,215,0.1);
+  border: 1px solid rgba(0,200,215,0.3);
+  border-radius: 20px; margin-bottom: 1.8rem;
+  font-size: 0.8rem; font-weight: 600; color: var(--cyan);
+}
+.pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--cyan); animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.3)} }
+h1 {
+  font-family: 'Libre Baskerville', serif;
+  font-size: clamp(2.6rem, 5vw, 4.6rem);
+  font-weight: 700; line-height: 1.1;
+  letter-spacing: -0.02em; margin-bottom: 1.5rem;
+}
+h1 .accent { color: var(--cyan); }
+h1 .accent2 {
+  background: linear-gradient(135deg, var(--gold), var(--amber));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.hero-desc {
+  font-size: 1.1rem; line-height: 1.75;
+  color: rgba(255,255,255,0.65); max-width: 520px; margin-bottom: 2.5rem;
+}
+.hero-btns { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 3rem; }
+.btn-primary {
+  padding: 0.85rem 2rem; background: var(--cyan); color: var(--navy);
+  border: none; border-radius: 6px; font-size: 0.92rem; font-weight: 700;
+  cursor: pointer; transition: all 0.25s;
+  text-decoration: none; display: inline-block;
+  font-family: 'Inter', sans-serif; letter-spacing: 0.01em;
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,200,215,0.4); }
+.btn-outline {
+  padding: 0.85rem 2rem; background: transparent;
+  color: var(--white); border: 1.5px solid rgba(255,255,255,0.3);
+  border-radius: 6px; font-size: 0.92rem; font-weight: 600;
+  cursor: pointer; transition: all 0.25s;
+  text-decoration: none; display: inline-block;
+  font-family: 'Inter', sans-serif;
+}
+.btn-outline:hover { border-color: var(--cyan); color: var(--cyan); }
+.hero-stats { display: flex; gap: 3rem; }
+.stat-num {
+  font-family: 'Inter', sans-serif;
+  font-size: 2rem; font-weight: 800;
+  color: var(--cyan); line-height: 1;
+}
+.stat-label { font-size: 0.78rem; color: var(--gray); margin-top: 0.3rem; }
+
+/* ── SECTION COMMONS ── */
+section { padding: 7rem 5%; position: relative; z-index: 1; }
+.section-eyebrow {
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--cyan);
+  margin-bottom: 0.8rem; display: block;
+  font-family: 'Inter', sans-serif;
+}
+.section-title {
+  font-family: 'Libre Baskerville', serif;
+  font-size: clamp(1.8rem, 3vw, 2.5rem);
+  font-weight: 700; line-height: 1.2;
+  letter-spacing: -0.02em; margin-bottom: 1rem;
+}
+.section-sub { font-size: 1rem; color: rgba(255,255,255,0.6); line-height: 1.75; max-width: 540px; }
+
+/* ── PROBLEM ── */
+#problem { background: var(--dark); }
+.problem-header { text-align: center; margin-bottom: 4rem; }
+.problem-header .section-sub { margin: 0 auto; }
+.problem-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+.problem-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px; padding: 2rem 1.8rem;
+  transition: all 0.3s; position: relative; overflow: hidden;
+}
+.problem-card::before {
+  content: ''; position: absolute;
+  top: 0; left: 0; right: 0; height: 3px;
+  border-radius: 3px 3px 0 0;
+}
+.problem-card.p1::before { background: var(--amber); }
+.problem-card.p2::before { background: var(--cyan); }
+.problem-card.p3::before { background: var(--qual); }
+.problem-card:hover { transform: translateY(-6px); background: rgba(255,255,255,0.06); }
+.problem-icon { font-size: 2.5rem; margin-bottom: 1.2rem; }
+.problem-title {
+  font-family: 'Inter', sans-serif;
+  font-size: 1.05rem; font-weight: 700; margin-bottom: 0.7rem;
+}
+.problem-desc { font-size: 0.9rem; color: rgba(255,255,255,0.6); line-height: 1.7; }
+
+/* ── SOLUTION ── */
+#solution { background: var(--navy); }
+.solution-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 5rem; align-items: center; }
+.solution-flow { display: flex; flex-direction: column; gap: 1rem; }
+.flow-step {
+  display: flex; gap: 1.2rem; align-items: flex-start;
+  padding: 1.2rem 1.4rem;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 14px; transition: all 0.3s;
+}
+.flow-step:hover { background: rgba(0,200,215,0.06); border-color: rgba(0,200,215,0.2); }
+.flow-step.highlight {
+  background: rgba(0,200,215,0.08);
+  border-color: rgba(0,200,215,0.35);
+}
+.step-num {
+  font-family: 'Inter', sans-serif; font-size: 0.7rem;
+  font-weight: 700; color: var(--cyan); letter-spacing: 0.06em;
+  min-width: 28px; padding-top: 0.15rem;
+}
+.step-title { font-weight: 700; font-size: 0.95rem; margin-bottom: 0.25rem; }
+.step-desc { font-size: 0.85rem; color: rgba(255,255,255,0.55); line-height: 1.6; }
+.solution-features { display: flex; flex-direction: column; gap: 1rem; }
+.feature-pill {
+  display: flex; align-items: center; gap: 1rem;
+  padding: 1.1rem 1.4rem;
+  background: var(--mid);
+  border-radius: 14px; border: 1px solid rgba(255,255,255,0.07);
+}
+.feature-icon { font-size: 1.6rem; flex-shrink: 0; }
+.feature-title { font-weight: 700; font-size: 0.95rem; margin-bottom: 0.2rem; }
+.feature-desc { font-size: 0.82rem; color: var(--gray); }
+
+/* ── PLATFORM ── */
+#platform { background: var(--dark); }
+.platform-header { text-align: center; margin-bottom: 4rem; }
+.spec-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+.spec-card {
+  background: var(--mid);
+  border-radius: 20px; overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.07);
+}
+.spec-card-header {
+  padding: 1.2rem 1.6rem;
+  font-family: 'Inter', sans-serif; font-size: 0.95rem; font-weight: 700; letter-spacing: 0.01em;
+}
+.spec-card.ai .spec-card-header { background: var(--blue); }
+.spec-card.hw .spec-card-header { background: var(--qual); }
+.spec-row {
+  display: flex; padding: 0.7rem 1.6rem;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  font-size: 0.88rem;
+}
+.spec-row:last-child { border-bottom: none; }
+.spec-row:nth-child(odd) { background: rgba(255,255,255,0.02); }
+.spec-key { color: var(--cyan); font-weight: 600; min-width: 130px; }
+.spec-val { color: rgba(255,255,255,0.8); }
+
+/* ── MARKET ── */
+#market { background: var(--navy); }
+.market-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-top: 3.5rem; }
+.market-card {
+  padding: 2rem 1.8rem;
+  background: var(--mid);
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.07);
+  transition: all 0.3s;
+}
+.market-card:hover { transform: translateY(-5px); border-color: rgba(0,200,215,0.25); }
+.market-flag { font-size: 2.5rem; margin-bottom: 1rem; }
+.market-country {
+  font-family: 'Inter', sans-serif;
+  font-size: 1.05rem; font-weight: 700; margin-bottom: 0.4rem;
+}
+.market-num { font-size: 1.7rem; font-weight: 800; color: var(--gold); margin-bottom: 0.3rem; font-family: 'Inter', sans-serif; }
+.market-desc { font-size: 0.85rem; color: var(--gray); line-height: 1.6; }
+.market-timeline {
+  display: inline-block; margin-top: 0.8rem;
+  padding: 0.25rem 0.8rem;
+  border-radius: 12px; font-size: 0.75rem; font-weight: 700;
+}
+.market-card.y1 .market-timeline { background: rgba(0,200,215,0.15); color: var(--cyan); }
+.market-card.y2 .market-timeline { background: rgba(249,168,37,0.15); color: var(--gold); }
+.market-card.y3 .market-timeline { background: rgba(67,160,71,0.15); color: var(--lgreen); }
+
+/* ── QUALCOMM ── */
+#qualcomm {
+  background: linear-gradient(135deg, #0E1F4D 0%, #0A1628 60%, #041220 100%);
+  text-align: center;
+}
+.qual-badge {
+  display: inline-flex; align-items: center; gap: 0.6rem;
+  padding: 0.5rem 1.2rem;
+  background: rgba(50,83,220,0.2);
+  border: 1px solid rgba(50,83,220,0.4);
+  border-radius: 20px; margin-bottom: 2rem;
+  font-size: 0.82rem; font-weight: 600; color: #8BAFF0;
+}
+.qual-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.2rem; margin-top: 3.5rem; }
+.qual-card {
+  padding: 1.8rem 1.4rem;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(50,83,220,0.25);
+  border-radius: 16px; transition: all 0.3s;
+}
+.qual-card:hover { border-color: rgba(50,83,220,0.6); background: rgba(50,83,220,0.1); }
+.qual-amount {
+  font-family: 'Inter', sans-serif;
+  font-size: 1.5rem; font-weight: 800;
+  color: var(--gold); margin-bottom: 0.5rem;
+}
+.qual-label { font-size: 0.88rem; color: var(--white); font-weight: 600; margin-bottom: 0.4rem; }
+.qual-desc { font-size: 0.78rem; color: var(--gray); line-height: 1.6; }
+
+/* ── TEAM ── */
+#team { background: var(--dark); }
+.founder-wrap {
+  display: grid; grid-template-columns: 1fr 1.6fr;
+  gap: 3rem; align-items: start; margin-top: 3rem;
+}
+.founder-left {
+  background: var(--mid);
+  border-radius: 20px; padding: 2.4rem;
+  border: 1px solid rgba(0,200,215,0.2);
+  text-align: center;
+}
+.founder-avatar {
+  width: 90px; height: 90px; border-radius: 50%;
+  background: linear-gradient(135deg, rgba(0,200,215,0.25), rgba(50,83,220,0.25));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 2.8rem; margin: 0 auto 1.4rem;
+  border: 2px solid rgba(0,200,215,0.3);
+}
+.founder-name {
+  font-family: 'Inter', sans-serif;
+  font-size: 1.25rem; font-weight: 700; margin-bottom: 0.3rem;
+}
+.founder-title { font-size: 0.82rem; color: var(--cyan); font-weight: 600; margin-bottom: 1.2rem; }
+.founder-tags { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center; margin-top: 1.2rem; }
+.founder-tag {
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px; font-size: 0.72rem; font-weight: 600;
+  background: rgba(0,200,215,0.1); border: 1px solid rgba(0,200,215,0.25);
+  color: var(--cyan);
+}
+.founder-right { display: flex; flex-direction: column; gap: 1rem; }
+.founder-card {
+  background: var(--mid);
+  border-radius: 16px; padding: 1.3rem 1.5rem;
+  border: 1px solid rgba(255,255,255,0.07);
+  display: flex; gap: 1rem; align-items: flex-start;
+  transition: all 0.3s;
+}
+.founder-card:hover { border-color: rgba(0,200,215,0.2); background: rgba(14,32,64,0.8); }
+.founder-card-icon { font-size: 1.6rem; flex-shrink: 0; margin-top: 0.1rem; }
+.founder-card-title {
+  font-weight: 700; font-size: 0.92rem;
+  margin-bottom: 0.25rem; color: var(--white);
+}
+.founder-card-desc { font-size: 0.83rem; color: rgba(255,255,255,0.6); line-height: 1.6; }
+.founder-card-accent { color: var(--gold); font-weight: 600; }
+/* legacy compat */
+.team-grid { display: none; }
+.cred { font-size: 0.85rem; color: rgba(255,255,255,0.65); display: flex; gap: 0.5rem; }
+.cred::before { content: '→'; color: var(--cyan); flex-shrink: 0; }
+@media(max-width:900px){ .founder-wrap{grid-template-columns:1fr;} }
+
+/* ── CONTACT ── */
+#contact {
+  background: var(--navy);
+  text-align: center; padding: 6rem 5%;
+}
+.contact-card {
+  max-width: 580px; margin: 3rem auto 0;
+  background: var(--mid);
+  border-radius: 24px; padding: 3rem;
+  border: 1px solid rgba(0,200,215,0.15);
+}
+.contact-item { display: flex; align-items: center; gap: 1rem; padding: 0.8rem 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.contact-item:last-child { border-bottom: none; }
+.contact-icon { font-size: 1.3rem; min-width: 28px; text-align: center; }
+.contact-text { font-size: 0.92rem; color: rgba(255,255,255,0.75); }
+.contact-text a { color: var(--cyan); text-decoration: none; }
+.contact-text a:hover { text-decoration: underline; }
+
+/* ── FOOTER ── */
+footer {
+  background: rgba(0,0,0,0.4);
+  padding: 2rem 5%;
+  display: flex; justify-content: space-between; align-items: center;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  font-size: 0.82rem; color: var(--gray);
+  flex-wrap: wrap; gap: 0.5rem;
+}
+.footer-logo { font-family: 'Inter', sans-serif; font-weight: 800; color: var(--white); }
+.footer-logo span { color: var(--cyan); }
+
+/* ── SCROLL REVEAL ── */
+.reveal { opacity: 0; transform: translateY(28px); transition: all 0.7s cubic-bezier(0.16,1,0.3,1); }
+.reveal.visible { opacity: 1; transform: translateY(0); }
+.reveal-d1 { transition-delay: 0.1s; }
+.reveal-d2 { transition-delay: 0.2s; }
+.reveal-d3 { transition-delay: 0.3s; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 900px) {
+  .problem-grid, .market-grid, .qual-grid { grid-template-columns: 1fr; }
+  .solution-wrap, .spec-grid, .team-grid { grid-template-columns: 1fr; }
+  .nav-links { display: none; }
+  .hero-stats { gap: 1.5rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">Medi<span>Edge</span></div>
+  <ul class="nav-links">
+    <li><a href="#problem" data-i18n="nav.problem">Problem</a></li>
+    <li><a href="#solution" data-i18n="nav.solution">Solution</a></li>
+    <li><a href="#platform" data-i18n="nav.platform">Platform</a></li>
+    <li><a href="#market" data-i18n="nav.market">Market</a></li>
+    <li><a href="#team" data-i18n="nav.team">Team</a></li>
+  </ul>
+  <div style="display:flex;align-items:center;gap:0.8rem;">
+    <div class="nav-lang">
+      <button class="lang-btn active" onclick="setLang('en',this)">EN</button>
+      <button class="lang-btn" onclick="setLang('ko',this)">한국어</button>
+      <button class="lang-btn" onclick="setLang('zh',this)">中文</button>
+      <button class="lang-btn" onclick="setLang('ja',this)">日本語</button>
+    </div>
+    <button class="nav-cta" onclick="document.getElementById('contact').scrollIntoView({behavior:'smooth'})" data-i18n="nav.cta">Contact Us</button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section id="hero">
+  <div class="hero-glow glow-1"></div>
+  <div class="hero-glow glow-2"></div>
+  <div class="hero-content">
+    <div class="hero-badge reveal"><div class="pulse"></div><span data-i18n="hero.badge">Powered by Qualcomm Dragonwing · QAIPI 2026 Applicant</span></div>
+    <h1 class="reveal reveal-d1" data-i18n-html="hero.title">X-ray AI<br><span class="accent">On-Device.</span><br><span class="accent2">No Cloud. No Wait.</span></h1>
+    <p class="hero-desc reveal reveal-d2" data-i18n="hero.desc">MediEdge delivers fracture and pneumonia detection in under 3 seconds — directly on a Qualcomm chip, with zero internet required. Built for rural clinics that need it most.</p>
+    <div class="hero-btns reveal reveal-d3">
+      <a href="#solution" class="btn-primary" data-i18n="hero.btn1">See How It Works</a>
+      <a href="#contact" class="btn-outline" data-i18n="hero.btn2">Get in Touch</a>
+    </div>
+    <div class="hero-stats reveal">
+      <div><div class="stat-num">3s</div><div class="stat-label" data-i18n="hero.stat1">AI Diagnosis Speed</div></div>
+      <div><div class="stat-num">88%+</div><div class="stat-label" data-i18n="hero.stat2">Fracture Accuracy</div></div>
+      <div><div class="stat-num">1,500+</div><div class="stat-label" data-i18n="hero.stat3">Target Rural Clinics</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- PROBLEM -->
+<section id="problem">
+  <div class="problem-header reveal">
+    <span class="section-eyebrow" data-i18n="problem.eyebrow">The Problem</span>
+    <h2 class="section-title" data-i18n="problem.title">Rural clinics have X-rays.<br>They have no one to read them.</h2>
+    <p class="section-sub" data-i18n="problem.sub">Across APAC, thousands of clinics own diagnostic imaging equipment — but lack the radiologists needed to interpret results. Patients suffer. Technology sits idle.</p>
+  </div>
+  <div class="problem-grid">
+    <div class="problem-card p1 reveal">
+      <div class="problem-icon">⚠️</div>
+      <div class="problem-title" data-i18n="prob1.title">Specialist Shortage</div>
+      <div class="problem-desc" data-i18n="prob1.desc">Korea's government relaxed MRI specialist requirements in 2026 — proof the rural healthcare crisis is worsening. 1,500+ clinics have X-ray equipment with no one qualified to read results.</div>
+    </div>
+    <div class="problem-card p2 reveal reveal-d1">
+      <div class="problem-icon">🕐</div>
+      <div class="problem-title" data-i18n="prob2.title">2+ Hour Delays</div>
+      <div class="problem-desc" data-i18n="prob2.desc">Cloud-based radiology reads cost ~$80 per image and take over 2 hours. Emergency patients travel 1–2 hours to city hospitals — often at serious medical risk.</div>
+    </div>
+    <div class="problem-card p3 reveal reveal-d2">
+      <div class="problem-icon">📡</div>
+      <div class="problem-title" data-i18n="prob3.title">Cloud AI Won't Reach</div>
+      <div class="problem-desc" data-i18n="prob3.desc">Existing AI radiology platforms (Lunit, Vuno, JLK) target large hospitals with stable internet. Rural and island clinics with unreliable connectivity are left behind entirely.</div>
+    </div>
+  </div>
+</section>
+
+<!-- SOLUTION -->
+<section id="solution">
+  <div class="solution-wrap">
+    <div>
+      <span class="section-eyebrow reveal" data-i18n="solution.eyebrow">Our Solution</span>
+      <h2 class="section-title reveal" data-i18n="solution.title">On-Device X-ray AI.<br>Works anywhere.</h2>
+      <p class="section-sub reveal" style="margin-bottom:2.5rem;" data-i18n="solution.sub">MediEdge runs entirely on a Qualcomm Dragonwing chip — delivering expert-level fracture detection with no internet, no cloud, no subscription per read.</p>
+      <div class="solution-flow">
+        <div class="flow-step reveal">
+          <span class="step-num">01</span>
+          <div><div class="step-title" data-i18n="step1.title">Patient Arrives</div><div class="step-desc" data-i18n="step1.desc">Patient presents at rural health center. Standard X-ray is captured using existing equipment.</div></div>
+        </div>
+        <div class="flow-step reveal reveal-d1">
+          <span class="step-num">02</span>
+          <div><div class="step-title" data-i18n="step2.title">Image Transfer</div><div class="step-desc" data-i18n="step2.desc">DICOM/JPEG image is sent to MediEdge device via local Wi-Fi or USB. No internet needed.</div></div>
+        </div>
+        <div class="flow-step highlight reveal reveal-d2">
+          <span class="step-num">03</span>
+          <div><div class="step-title" data-i18n="step3.title">⚡ AI Analysis in &lt;3 Seconds</div><div class="step-desc" data-i18n="step3.desc">Qualcomm NPU processes the image on-device. Fracture location, confidence score, and urgency level are displayed instantly.</div></div>
+        </div>
+        <div class="flow-step reveal reveal-d3">
+          <span class="step-num">04</span>
+          <div><div class="step-title" data-i18n="step4.title">Clinical Decision</div><div class="step-desc" data-i18n="step4.desc">GP or nurse uses AI result as decision support — treat on-site or refer immediately. Patient data stays local.</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="solution-features">
+      <div class="feature-pill reveal">
+        <div class="feature-icon">🔒</div>
+        <div>
+          <div class="feature-title" data-i18n="feat1.title">100% On-Device Privacy</div>
+          <div class="feature-desc" data-i18n="feat1.desc">Patient data never leaves the clinic. Full HIPAA & PIPA compliance by design.</div>
+        </div>
+      </div>
+      <div class="feature-pill reveal reveal-d1">
+        <div class="feature-icon">⚡</div>
+        <div>
+          <div class="feature-title" data-i18n="feat2.title">Qualcomm NPU Powered</div>
+          <div class="feature-desc" data-i18n="feat2.desc">INT8-optimized model runs at under 10W on Dragonwing QRB2210. Clinic-friendly power.</div>
+        </div>
+      </div>
+      <div class="feature-pill reveal reveal-d2">
+        <div class="feature-icon">💰</div>
+        <div>
+          <div class="feature-title" data-i18n="feat3.title">80% Cost Reduction</div>
+          <div class="feature-desc" data-i18n="feat3.desc">$3,500 one-time device vs. $80/read ongoing cloud fees. ROI in under 6 months.</div>
+        </div>
+      </div>
+      <div class="feature-pill reveal reveal-d3">
+        <div class="feature-icon">🌐</div>
+        <div>
+          <div class="feature-title" data-i18n="feat4.title">Works Completely Offline</div>
+          <div class="feature-desc" data-i18n="feat4.desc">Island clinics, mountain villages, disaster zones — MediEdge works wherever patients are.</div>
+        </div>
+      </div>
+      <div class="feature-pill reveal">
+        <div class="feature-icon">🎯</div>
+        <div>
+          <div class="feature-title" data-i18n="feat5.title">88%+ Detection Accuracy</div>
+          <div class="feature-desc" data-i18n="feat5.desc">MobileNetV3 model trained on NIH ChestX-ray14 + MURA. 92%+ sensitivity for fractures.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PLATFORM -->
+<section id="platform">
+  <div class="platform-header reveal">
+    <span class="section-eyebrow" data-i18n="platform.eyebrow">Technology</span>
+    <h2 class="section-title" data-i18n="platform.title">Built on Qualcomm Dragonwing</h2>
+    <p class="section-sub" data-i18n="platform.sub">The only edge platform delivering dedicated AI inference + sub-10W power + compact form factor at a clinic-affordable price point.</p>
+  </div>
+  <div class="spec-grid">
+    <div class="spec-card ai reveal">
+      <div class="spec-card-header" data-i18n="spec.ai">AI Model</div>
+      <div class="spec-row"><span class="spec-key" data-i18n="spec.arch">Architecture</span><span class="spec-val">MobileNetV3-based CNN</span></div>
+      <div class="spec-row"><span class="spec-key" data-i18n="spec.data">Training Data</span><span class="spec-val">NIH ChestX-ray14 + MURA (100K+ images)</span></div>
+      <div class="spec-row"><span class="spec-key" data-i18n="spec.opt">Optimization</span><span class="spec-val">INT8 quantization + pruning &lt;50MB</span></div>
+      <div class="spec-row"><span class="spec-key" data-i18n="spec.fw">Framework</span><span class="spec-val">PyTorch → ONNX → Qualcomm SNPE</span></div>
+      <div class="spec-row"><span class="spec-key" data-i18n="spec.acc">Accuracy</span><span class="spec-val">88%+ fracture · 92%+ sensitivity</span></div>
+      <div class="spec-row"><span class="spec-key" data-i18n="spec.speed">Speed</span><span class="spec-val">&lt;3 seconds on-device inference</span></div>
+    </div>
+    <div class="spec-card hw reveal reveal-d1">
+      <div class="spec-card-header" data-i18n="spec.hw">Qualcomm Dragonwing QRB2210</div>
+      <div class="spec-row"><span class="spec-key">CPU</span><span class="spec-val">Quad-core ARM Cortex-A53 @ 2.0GHz</span></div>
+      <div class="spec-row"><span class="spec-key">NPU</span><span class="spec-val">Qualcomm AI Engine (dedicated)</span></div>
+      <div class="spec-row"><span class="spec-key">RAM / Storage</span><span class="spec-val">2GB LPDDR4 / 16GB eMMC</span></div>
+      <div class="spec-row"><span class="spec-key" data-i18n="spec.power">Power</span><span class="spec-val">5–10W (clinic-friendly)</span></div>
+      <div class="spec-row"><span class="spec-key" data-i18n="spec.conn">Connectivity</span><span class="spec-val">Wi-Fi 5 · Bluetooth 5.1</span></div>
+      <div class="spec-row"><span class="spec-key">OS</span><span class="spec-val">Linux (Yocto Project)</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- MARKET -->
+<section id="market">
+  <div class="reveal">
+    <span class="section-eyebrow" data-i18n="market.eyebrow">Target Market</span>
+    <h2 class="section-title" data-i18n="market.title">APAC Rural Healthcare</h2>
+    <p class="section-sub" data-i18n="market.sub">Starting with Korea's 1,500+ underserved rural clinics, expanding across APAC over 5 years to a $17.5M addressable market.</p>
+  </div>
+  <div class="market-grid">
+    <div class="market-card y1 reveal">
+      <div class="market-flag">🇰🇷</div>
+      <div class="market-country" data-i18n="mkt1.country">South Korea</div>
+      <div class="market-num">1,500+</div>
+      <div class="market-desc" data-i18n="mkt1.desc">Rural health centers with X-ray equipment but no radiologist. Government digital health subsidies cover 50–80% of equipment costs.</div>
+      <span class="market-timeline" data-i18n="mkt1.timeline">Year 1 — Primary Market</span>
+    </div>
+    <div class="market-card y2 reveal reveal-d1">
+      <div class="market-flag">🇯🇵</div>
+      <div class="market-country" data-i18n="mkt2.country">Japan</div>
+      <div class="market-num">8,000+</div>
+      <div class="market-desc" data-i18n="mkt2.desc">Rural and understaffed clinics in aging communities across Hokkaido, Tohoku, and remote island regions with critical specialist shortages.</div>
+      <span class="market-timeline" data-i18n="mkt2.timeline">Year 2 — Expansion</span>
+    </div>
+    <div class="market-card y3 reveal reveal-d2">
+      <div class="market-flag">🌏</div>
+      <div class="market-country" data-i18n="mkt3.country">Southeast Asia</div>
+      <div class="market-num">$17.5M</div>
+      <div class="market-desc" data-i18n="mkt3.desc">Philippines, Indonesia, Vietnam — island and rural communities with diagnostic equipment but no trained radiologists. NGO and government hospital programs.</div>
+      <span class="market-timeline" data-i18n="mkt3.timeline">Year 3–5 — Scale</span>
+    </div>
+  </div>
+</section>
+
+<!-- QUALCOMM PROGRAM -->
+<section id="qualcomm">
+  <div class="qual-badge reveal">⚡ Qualcomm AI Innovator Program 2026 — APAC Applicant</div>
+  <h2 class="section-title reveal" data-i18n="qual.title">Why Qualcomm + MediEdge</h2>
+  <p class="section-sub reveal" style="margin:0 auto 0;" data-i18n="qual.sub">MediEdge is built for exactly what Qualcomm's program supports — real-world on-device AI with social impact, not a lab prototype.</p>
+  <div class="qual-grid">
+    <div class="qual-card reveal">
+      <div class="qual-amount">$2,500</div>
+      <div class="qual-label" data-i18n="qual1.label">Hardware Kit</div>
+      <div class="qual-desc" data-i18n="qual1.desc">Dragonwing dev board + sensors for clinical prototype development</div>
+    </div>
+    <div class="qual-card reveal reveal-d1">
+      <div class="qual-amount">$10,000</div>
+      <div class="qual-label" data-i18n="qual2.label">Completion Grant</div>
+      <div class="qual-desc" data-i18n="qual2.desc">Clinical pilot deployment at 5+ rural health centers in Korea</div>
+    </div>
+    <div class="qual-card reveal reveal-d2">
+      <div class="qual-amount">$5,000</div>
+      <div class="qual-label" data-i18n="qual3.label">Patent Award</div>
+      <div class="qual-desc" data-i18n="qual3.desc">File IP for on-device X-ray AI diagnostic method</div>
+    </div>
+    <div class="qual-card reveal reveal-d3">
+      <div class="qual-amount">6mo</div>
+      <div class="qual-label" data-i18n="qual4.label">Mentorship</div>
+      <div class="qual-desc" data-i18n="qual4.desc">1:1 guidance from Qualcomm engineers + business coaching + demo day</div>
+    </div>
+  </div>
+</section>
+
+<!-- TEAM -->
+<section id="team">
+  <span class="section-eyebrow reveal" data-i18n="team.eyebrow">Founder</span>
+  <h2 class="section-title reveal" data-i18n="team.title">Where Medicine Meets Technology</h2>
+  <p class="section-sub reveal" data-i18n="team.sub">MediEdge was built by someone with medicine in his blood and technology in his hands.</p>
+
+  <div class="founder-wrap">
+    <!-- Left: identity card -->
+    <div class="founder-left reveal">
+      <div class="founder-avatar">👨‍💼</div>
+      <div class="founder-name">Kent Kim</div>
+      <div class="founder-title" data-i18n="t1.role">Founder & CEO · MediEdge</div>
+      <div style="font-size:0.82rem;color:rgba(255,255,255,0.55);line-height:1.7;margin-top:0.8rem;" data-i18n="t1.quote">"My grandfather healed with herbs.<br>I heal with algorithms."</div>
+      <div class="founder-tags">
+        <span class="founder-tag">Harvard Economics</span>
+        <span class="founder-tag">AI / On-Device</span>
+        <span class="founder-tag">Metaverse</span>
+        <span class="founder-tag">Blockchain</span>
+        <span class="founder-tag">Healthcare DNA</span>
+      </div>
+    </div>
+
+    <!-- Right: credential cards -->
+    <div class="founder-right">
+      <div class="founder-card reveal">
+        <div class="founder-card-icon">🎓</div>
+        <div>
+          <div class="founder-card-title" data-i18n="tc1.title">Harvard University — Economics</div>
+          <div class="founder-card-desc" data-i18n="tc1.desc">Analytical foundation in economics, policy, and market systems. Applied directly to healthcare market gap analysis and MediEdge's go-to-market strategy across Korea, Japan, and Southeast Asia.</div>
+        </div>
+      </div>
+      <div class="founder-card reveal reveal-d1">
+        <div class="founder-card-icon">🌿</div>
+        <div>
+          <div class="founder-card-title" data-i18n="tc2.title">Medicine in the Family</div>
+          <div class="founder-card-desc" data-i18n="tc2.desc"><span class="founder-card-accent" data-i18n="tc2.accent">Maternal grandfather was a Korean traditional herbal doctor (한의사).</span> <span data-i18n="tc2.rest">3 cousins are practicing medical doctors. Healthcare is not just a market for MediEdge — it's personal.</span></div>
+        </div>
+      </div>
+      <div class="founder-card reveal reveal-d2">
+        <div class="founder-card-icon">💻</div>
+        <div>
+          <div class="founder-card-title" data-i18n="tc3.title">Deep IT & Emerging Tech Experience</div>
+          <div class="founder-card-desc" data-i18n="tc3.desc">Hands-on experience across AI platform development, metaverse infrastructure, and blockchain systems. Brings full-stack technology perspective to on-device AI architecture and clinical deployment.</div>
+        </div>
+      </div>
+      <div class="founder-card reveal reveal-d3">
+        <div class="founder-card-icon">🏥</div>
+        <div>
+          <div class="founder-card-title" data-i18n="tc4.title">Clinical Network & Market Access</div>
+          <div class="founder-card-desc" data-i18n="tc4.desc">Direct access to medical professionals through family network. 2 rural health center pilot partners confirmed. Deep understanding of how rural clinics operate, procure, and make clinical decisions.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CONTACT -->
+<section id="contact">
+  <span class="section-eyebrow reveal" data-i18n="contact.eyebrow">Contact</span>
+  <h2 class="section-title reveal" data-i18n="contact.title">Get in Touch</h2>
+  <p class="section-sub reveal" style="margin:0 auto;" data-i18n="contact.sub">Interested in piloting MediEdge, investing, or collaborating? We'd love to hear from you.</p>
+  <div class="contact-card reveal">
+    <div class="contact-item">
+      <div class="contact-icon">📧</div>
+      <div class="contact-text"><a href="mailto:contact@mediedge.io">contact@mediedge.io</a></div>
+    </div>
+    <div class="contact-item">
+      <div class="contact-icon">🌐</div>
+      <div class="contact-text" data-i18n="contact.website">mediedge.io (this site) — hosted on Vercel</div>
+    </div>
+    <div class="contact-item">
+      <div class="contact-icon">📍</div>
+      <div class="contact-text" data-i18n="contact.location">Seoul, South Korea</div>
+    </div>
+    <div class="contact-item">
+      <div class="contact-icon">🚀</div>
+      <div class="contact-text" data-i18n="contact.program">Applying: Qualcomm AI Innovator Program 2026 — APAC</div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">Medi<span>Edge</span></div>
+  <div data-i18n="footer.copy">© 2026 MediEdge. On-Device X-ray AI for Rural Healthcare.</div>
+  <div data-i18n="footer.tag">Technology for those who need it most.</div>
+</footer>
+
+<!-- i18n DATA -->
+<script>
+const i18n = {
+  en: {
+    "nav.problem":"Problem","nav.solution":"Solution","nav.platform":"Platform",
+    "nav.market":"Market","nav.team":"Team","nav.cta":"Contact Us",
+    "hero.badge":"Powered by Qualcomm Dragonwing · QAIPI 2026 Applicant",
+    "hero.title":"X-ray AI<br><span class='accent'>On-Device.</span><br><span class='accent2'>No Cloud. No Wait.</span>",
+    "hero.desc":"MediEdge delivers fracture and pneumonia detection in under 3 seconds — directly on a Qualcomm chip, with zero internet required. Built for rural clinics that need it most.",
+    "hero.btn1":"See How It Works","hero.btn2":"Get in Touch",
+    "hero.stat1":"AI Diagnosis Speed","hero.stat2":"Fracture Accuracy","hero.stat3":"Target Rural Clinics",
+    "problem.eyebrow":"The Problem",
+    "problem.title":"Rural clinics have X-rays.<br>They have no one to read them.",
+    "problem.sub":"Across APAC, thousands of clinics own diagnostic imaging equipment — but lack the radiologists needed to interpret results. Patients suffer. Technology sits idle.",
+    "prob1.title":"Specialist Shortage","prob1.desc":"Korea's government relaxed MRI specialist requirements in 2026 — proof the rural healthcare crisis is worsening. 1,500+ clinics have X-ray equipment with no one qualified to read results.",
+    "prob2.title":"2+ Hour Delays","prob2.desc":"Cloud-based radiology reads cost ~$80 per image and take over 2 hours. Emergency patients travel 1–2 hours to city hospitals — often at serious medical risk.",
+    "prob3.title":"Cloud AI Won't Reach","prob3.desc":"Existing AI radiology platforms target large hospitals with stable internet. Rural and island clinics with unreliable connectivity are left behind entirely.",
+    "solution.eyebrow":"Our Solution","solution.title":"On-Device X-ray AI.<br>Works anywhere.",
+    "solution.sub":"MediEdge runs entirely on a Qualcomm Dragonwing chip — delivering expert-level fracture detection with no internet, no cloud, no subscription per read.",
+    "step1.title":"Patient Arrives","step1.desc":"Patient presents at rural health center. Standard X-ray is captured using existing equipment.",
+    "step2.title":"Image Transfer","step2.desc":"DICOM/JPEG image is sent to MediEdge device via local Wi-Fi or USB. No internet needed.",
+    "step3.title":"⚡ AI Analysis in <3 Seconds","step3.desc":"Qualcomm NPU processes the image on-device. Fracture location, confidence score, and urgency level displayed instantly.",
+    "step4.title":"Clinical Decision","step4.desc":"GP or nurse uses AI result as decision support — treat on-site or refer immediately. Patient data stays local.",
+    "feat1.title":"100% On-Device Privacy","feat1.desc":"Patient data never leaves the clinic. Full HIPAA & PIPA compliance by design.",
+    "feat2.title":"Qualcomm NPU Powered","feat2.desc":"INT8-optimized model runs at under 10W on Dragonwing QRB2210. Clinic-friendly power.",
+    "feat3.title":"80% Cost Reduction","feat3.desc":"$3,500 one-time device vs. $80/read ongoing cloud fees. ROI in under 6 months.",
+    "feat4.title":"Works Completely Offline","feat4.desc":"Island clinics, mountain villages, disaster zones — MediEdge works wherever patients are.",
+    "feat5.title":"88%+ Detection Accuracy","feat5.desc":"MobileNetV3 model trained on NIH ChestX-ray14 + MURA. 92%+ sensitivity for fractures.",
+    "platform.eyebrow":"Technology","platform.title":"Built on Qualcomm Dragonwing",
+    "platform.sub":"The only edge platform delivering dedicated AI inference + sub-10W power + compact form factor at a clinic-affordable price point.",
+    "spec.ai":"AI Model","spec.hw":"Qualcomm Dragonwing QRB2210",
+    "spec.arch":"Architecture","spec.data":"Training Data","spec.opt":"Optimization",
+    "spec.fw":"Framework","spec.acc":"Accuracy","spec.speed":"Speed",
+    "spec.power":"Power","spec.conn":"Connectivity",
+    "market.eyebrow":"Target Market","market.title":"APAC Rural Healthcare",
+    "market.sub":"Starting with Korea's 1,500+ underserved rural clinics, expanding across APAC over 5 years to a $17.5M addressable market.",
+    "mkt1.country":"South Korea","mkt1.desc":"Rural health centers with X-ray equipment but no radiologist. Government digital health subsidies cover 50–80% of equipment costs.","mkt1.timeline":"Year 1 — Primary Market",
+    "mkt2.country":"Japan","mkt2.desc":"Rural and understaffed clinics in aging communities across Hokkaido, Tohoku, and remote island regions with critical specialist shortages.","mkt2.timeline":"Year 2 — Expansion",
+    "mkt3.country":"Southeast Asia","mkt3.desc":"Philippines, Indonesia, Vietnam — island and rural communities with diagnostic equipment but no trained radiologists.","mkt3.timeline":"Year 3–5 — Scale",
+    "qual.title":"Why Qualcomm + MediEdge","qual.sub":"MediEdge is built for exactly what Qualcomm's program supports — real-world on-device AI with social impact, not a lab prototype.",
+    "qual1.label":"Hardware Kit","qual1.desc":"Dragonwing dev board + sensors for clinical prototype development",
+    "qual2.label":"Completion Grant","qual2.desc":"Clinical pilot deployment at 5+ rural health centers in Korea",
+    "qual3.label":"Patent Award","qual3.desc":"File IP for on-device X-ray AI diagnostic method",
+    "qual4.label":"Mentorship","qual4.desc":"1:1 guidance from Qualcomm engineers + business coaching + demo day",
+    "team.eyebrow":"Founder","team.title":"Where Medicine Meets Technology",
+    "team.sub":"MediEdge was built by someone with medicine in his blood and technology in his hands.",
+    "t1.role":"Founder & CEO · MediEdge",
+    "t1.quote":"\"My grandfather healed with herbs.<br>I heal with algorithms.\"",
+    "tc1.title":"Harvard University — Economics",
+    "tc1.desc":"Analytical foundation in economics, policy, and market systems. Applied directly to healthcare market gap analysis and MediEdge's go-to-market strategy across Korea, Japan, and Southeast Asia.",
+    "tc2.title":"Medicine in the Family",
+    "tc2.accent":"Maternal grandfather was a Korean traditional herbal doctor (한의사).",
+    "tc2.rest":"3 cousins are practicing medical doctors. Healthcare is not just a market for MediEdge — it's personal.",
+    "tc3.title":"Deep IT & Emerging Tech Experience",
+    "tc3.desc":"Hands-on experience across AI platform development, metaverse infrastructure, and blockchain systems. Brings full-stack technology perspective to on-device AI architecture and clinical deployment.",
+    "tc4.title":"Clinical Network & Market Access",
+    "tc4.desc":"Direct access to medical professionals through family network. 2 rural health center pilot partners confirmed. Deep understanding of how rural clinics operate, procure, and make clinical decisions.",
+    "contact.eyebrow":"Contact","contact.title":"Get in Touch",
+    "contact.sub":"Interested in piloting MediEdge, investing, or collaborating? We'd love to hear from you.",
+    "contact.website":"mediedge.io — hosted on Vercel",
+    "contact.location":"Seoul, South Korea",
+    "contact.program":"Applying: Qualcomm AI Innovator Program 2026 — APAC",
+    "footer.copy":"© 2026 MediEdge. On-Device X-ray AI for Rural Healthcare.",
+    "footer.tag":"Technology for those who need it most."
+  },
+  ko: {
+    "nav.problem":"문제","nav.solution":"솔루션","nav.platform":"플랫폼",
+    "nav.market":"시장","nav.team":"팀","nav.cta":"문의하기",
+    "hero.badge":"Qualcomm Dragonwing 탑재 · QAIPI 2026 지원사",
+    "hero.title":"X-ray AI<br><span class='accent'>온디바이스.</span><br><span class='accent2'>클라우드 불필요.</span>",
+    "hero.desc":"MediEdge는 인터넷 없이 Qualcomm 칩 위에서 3초 이내에 골절 및 폐렴을 감지합니다. 가장 필요로 하는 농촌 의료기관을 위해 만들었습니다.",
+    "hero.btn1":"작동 방식 보기","hero.btn2":"문의하기",
+    "hero.stat1":"AI 진단 속도","hero.stat2":"골절 감지 정확도","hero.stat3":"타겟 농촌 의료기관",
+    "problem.eyebrow":"문제","problem.title":"농촌 의원에 X-ray는 있다.<br>판독할 사람이 없을 뿐.",
+    "problem.sub":"APAC 전역에서 수천 개의 의원이 영상 진단 장비를 보유하고 있지만, 결과를 해석할 영상의학과 전문의가 없습니다. 환자는 고통받고, 장비는 놀고 있습니다.",
+    "prob1.title":"전문의 부족","prob1.desc":"한국 정부는 2026년 MRI 전문의 기준을 완화했습니다 — 농촌 의료 위기가 심화되고 있다는 증거입니다. 1,500개 이상의 의원이 X-ray 장비를 보유하지만 판독 가능한 인력이 없습니다.",
+    "prob2.title":"2시간 이상 지연","prob2.desc":"클라우드 기반 판독은 건당 약 $80이며 2시간 이상 소요됩니다. 응급 환자는 1~2시간 거리의 도시 병원으로 이송되어야 합니다.",
+    "prob3.title":"클라우드 AI는 닿지 않는다","prob3.desc":"기존 AI 영상의학 플랫폼은 안정적인 인터넷을 갖춘 대형 병원을 대상으로 합니다. 불안정한 연결 환경의 농촌·도서 의원은 완전히 소외되어 있습니다.",
+    "solution.eyebrow":"솔루션","solution.title":"온디바이스 X-ray AI.<br>어디서나 작동.",
+    "solution.sub":"MediEdge는 Qualcomm Dragonwing 칩 위에서 완전히 실행됩니다 — 인터넷, 클라우드, 건당 구독료 없이 전문의 수준의 골절 감지를 제공합니다.",
+    "step1.title":"환자 내원","step1.desc":"환자가 농촌 보건소에 방문합니다. 기존 장비로 표준 X-ray를 촬영합니다.",
+    "step2.title":"이미지 전송","step2.desc":"DICOM/JPEG 이미지를 로컬 Wi-Fi 또는 USB로 MediEdge 기기에 전송합니다. 인터넷 불필요.",
+    "step3.title":"⚡ 3초 이내 AI 분석","step3.desc":"Qualcomm NPU가 온디바이스로 이미지를 처리합니다. 골절 위치, 신뢰도, 긴급도가 즉시 표시됩니다.",
+    "step4.title":"임상적 판단","step4.desc":"의사나 간호사가 AI 결과를 의사결정 지원으로 활용합니다. 환자 데이터는 기관 내에 유지됩니다.",
+    "feat1.title":"100% 온디바이스 프라이버시","feat1.desc":"환자 데이터는 절대 의원 밖으로 나가지 않습니다. 설계 단계부터 HIPAA & 개인정보보호법 준수.",
+    "feat2.title":"Qualcomm NPU 탑재","feat2.desc":"INT8 최적화 모델이 Dragonwing QRB2210에서 10W 이하로 실행됩니다.",
+    "feat3.title":"80% 비용 절감","feat3.desc":"$3,500 일회성 기기 비용 vs. 건당 $80 클라우드 요금. 6개월 이내 투자 회수.",
+    "feat4.title":"완전 오프라인 작동","feat4.desc":"도서 지역, 산간 마을, 재난 지역 — MediEdge는 환자가 있는 곳이면 어디서나 작동합니다.",
+    "feat5.title":"88%+ 감지 정확도","feat5.desc":"NIH ChestX-ray14 + MURA로 학습된 MobileNetV3 모델. 골절 민감도 92%+.",
+    "platform.eyebrow":"기술","platform.title":"Qualcomm Dragonwing 기반",
+    "platform.sub":"전용 AI 추론 + 10W 이하 전력 + 소형 폼팩터를 의원 수준의 가격으로 제공하는 유일한 엣지 플랫폼.",
+    "spec.ai":"AI 모델","spec.hw":"Qualcomm Dragonwing QRB2210",
+    "spec.arch":"아키텍처","spec.data":"학습 데이터","spec.opt":"최적화",
+    "spec.fw":"프레임워크","spec.acc":"정확도","spec.speed":"속도",
+    "spec.power":"전력","spec.conn":"연결",
+    "market.eyebrow":"타겟 시장","market.title":"APAC 농촌 의료",
+    "market.sub":"한국 1,500개 이상의 소외된 농촌 의원을 시작으로, 5년에 걸쳐 APAC 전역 $17.5M 시장으로 확장합니다.",
+    "mkt1.country":"대한민국","mkt1.desc":"X-ray 장비는 있지만 영상의학과 전문의가 없는 농촌 보건소. 정부 디지털 의료 보조금이 장비 비용의 50~80%를 지원합니다.","mkt1.timeline":"1년차 — 주력 시장",
+    "mkt2.country":"일본","mkt2.desc":"홋카이도, 도호쿠, 외딴 도서 지역 고령화 커뮤니티의 농촌·인력 부족 의원. 전문의 부족 심각.","mkt2.timeline":"2년차 — 확장",
+    "mkt3.country":"동남아시아","mkt3.desc":"필리핀, 인도네시아, 베트남 — 진단 장비는 있지만 영상의학과 전문의가 없는 도서·농촌 지역. NGO 및 정부 병원 프로그램.","mkt3.timeline":"3~5년차 — 스케일업",
+    "qual.title":"왜 Qualcomm + MediEdge인가","qual.sub":"MediEdge는 퀄컴 프로그램이 지원하는 것 — 실제 현장 배포, 사회적 임팩트가 있는 온디바이스 AI — 을 위해 만들어졌습니다.",
+    "qual1.label":"하드웨어 키트","qual1.desc":"임상 프로토타입 개발을 위한 Dragonwing 개발 보드 + 센서",
+    "qual2.label":"완료 지원금","qual2.desc":"한국 농촌 보건소 5개 이상 임상 파일럿 배포",
+    "qual3.label":"특허 장려금","qual3.desc":"온디바이스 X-ray AI 진단 방법 특허 출원",
+    "qual4.label":"멘토링","qual4.desc":"퀄컴 엔지니어 1:1 지도 + 비즈니스 코칭 + 데모데이",
+    "team.eyebrow":"창업자","team.title":"의학과 기술이 만나는 곳",
+    "team.sub":"MediEdge는 의학이 핏줄에 흐르고 기술이 손끝에 있는 사람이 만들었습니다.",
+    "t1.role":"창업자 & CEO · MediEdge",
+    "t1.quote":"\"외할아버지는 한약으로 사람을 고쳤습니다.<br>저는 알고리즘으로 고칩니다.\"",
+    "tc1.title":"하버드대학교 — 경제학",
+    "tc1.desc":"경제학, 정책, 시장 시스템에 대한 분석적 기반. 헬스케어 시장 공백 분석과 한국·일본·동남아 시장 진출 전략에 직접 적용됩니다.",
+    "tc2.title":"의학이 흐르는 가문",
+    "tc2.accent":"외할아버지는 한의사였습니다.",
+    "tc2.rest":"사촌 3명이 현직 의사입니다. MediEdge에게 헬스케어는 단순한 시장이 아닙니다 — 개인적인 사명입니다.",
+    "tc3.title":"IT & 신기술 실전 경험",
+    "tc3.desc":"AI 플랫폼 개발, 메타버스 인프라, 블록체인 시스템 전반에 걸친 실전 경험. 온디바이스 AI 아키텍처와 임상 배포에 풀스택 기술 관점을 가져옵니다.",
+    "tc4.title":"임상 네트워크 & 시장 접근성",
+    "tc4.desc":"가족 네트워크를 통한 의료 전문가 직접 접근. 농촌 보건소 파일럿 파트너 2곳 확보 완료. 농촌 의원이 어떻게 운영되고, 조달하고, 임상적 판단을 내리는지 깊이 이해하고 있습니다.",
+    "contact.eyebrow":"문의","contact.title":"연락하기",
+    "contact.sub":"MediEdge 파일럿, 투자, 협력에 관심 있으신가요? 언제든지 연락 주세요.",
+    "contact.website":"mediedge.io — Vercel 호스팅",
+    "contact.location":"대한민국 서울",
+    "contact.program":"지원 중: Qualcomm AI 이노베이터 프로그램 2026 — APAC",
+    "footer.copy":"© 2026 MediEdge. 농촌 의료를 위한 온디바이스 X-ray AI.",
+    "footer.tag":"가장 필요한 곳을 위한 기술."
+  },
+  zh: {
+    "nav.problem":"问题","nav.solution":"解决方案","nav.platform":"技术平台",
+    "nav.market":"市场","nav.team":"团队","nav.cta":"联系我们",
+    "hero.badge":"搭载 Qualcomm Dragonwing · QAIPI 2026 申请者",
+    "hero.title":"X光AI<br><span class='accent'>本地处理。</span><br><span class='accent2'>无需云端。即刻诊断。</span>",
+    "hero.desc":"MediEdge 在 Qualcomm 芯片上直接运行，无需互联网，3秒内完成骨折与肺炎检测。专为最需要它的农村诊所而生。",
+    "hero.btn1":"了解工作原理","hero.btn2":"联系我们",
+    "hero.stat1":"AI 诊断速度","hero.stat2":"骨折检测准确率","hero.stat3":"目标农村诊所",
+    "problem.eyebrow":"问题所在",
+    "problem.title":"农村诊所有X光机，<br>却没有人能判读结果。",
+    "problem.sub":"在整个亚太地区，数千家诊所拥有医学影像设备，却缺乏解读结果的放射科医生。患者受苦，设备闲置。",
+    "prob1.title":"专科医生短缺","prob1.desc":"韩国政府于2026年放宽了MRI专科医生要求——这证明农村医疗危机正在加剧。超过1,500家诊所拥有X光设备，却没有具备资质的医生判读结果。",
+    "prob2.title":"等待超过2小时","prob2.desc":"基于云端的放射判读每次收费约80美元，需等待超过2小时。急诊患者须前往1-2小时车程外的城市医院，往往面临严重的医疗风险。",
+    "prob3.title":"云端AI无法覆盖","prob3.desc":"现有AI放射平台针对拥有稳定网络的大型医院。网络不稳定的农村和海岛诊所被完全忽视。",
+    "solution.eyebrow":"我们的解决方案","solution.title":"本地X光AI。<br>随处可用。",
+    "solution.sub":"MediEdge 完全在 Qualcomm Dragonwing 芯片上运行——无需网络、无需云端、无需按次付费，提供专家级骨折检测。",
+    "step1.title":"患者就诊","step1.desc":"患者到农村卫生中心就诊，使用现有设备拍摄标准X光片。",
+    "step2.title":"图像传输","step2.desc":"通过本地Wi-Fi或USB将DICOM/JPEG图像发送至MediEdge设备，无需互联网。",
+    "step3.title":"⚡ 3秒内AI分析","step3.desc":"Qualcomm NPU在设备上处理图像，即时显示骨折位置、置信度评分和紧急程度。",
+    "step4.title":"临床决策","step4.desc":"全科医生或护士将AI结果用作辅助决策——就地治疗或立即转诊。患者数据保留在本地。",
+    "feat1.title":"100%本地隐私保护","feat1.desc":"患者数据永远不会离开诊所。设计层面即满足HIPAA合规要求。",
+    "feat2.title":"Qualcomm NPU 驱动","feat2.desc":"INT8优化模型在 Dragonwing QRB2210 上以不足10W运行，适合诊所环境。",
+    "feat3.title":"降低80%成本","feat3.desc":"3,500美元一次性设备费 vs. 每次80美元的云端服务费。6个月内收回投资。",
+    "feat4.title":"完全离线运行","feat4.desc":"海岛诊所、山村、灾区——MediEdge在患者所在的任何地方都能工作。",
+    "feat5.title":"88%+检测准确率","feat5.desc":"基于NIH ChestX-ray14和MURA训练的MobileNetV3模型，骨折敏感度超92%。",
+    "platform.eyebrow":"技术","platform.title":"基于 Qualcomm Dragonwing 构建",
+    "platform.sub":"唯一以诊所可承受的价格，提供专用AI推理+低于10W功耗+紧凑外形的边缘计算平台。",
+    "spec.ai":"AI模型","spec.hw":"Qualcomm Dragonwing QRB2210",
+    "spec.arch":"架构","spec.data":"训练数据","spec.opt":"优化",
+    "spec.fw":"框架","spec.acc":"准确率","spec.speed":"速度",
+    "spec.power":"功耗","spec.conn":"连接",
+    "market.eyebrow":"目标市场","market.title":"亚太农村医疗",
+    "market.sub":"从韩国1,500多家医疗资源匮乏的农村诊所起步，5年内扩展至1,750万美元的亚太可寻址市场。",
+    "mkt1.country":"韩国","mkt1.desc":"拥有X光设备但没有放射科医生的农村卫生中心。政府数字医疗补贴覆盖50-80%的设备成本。","mkt1.timeline":"第1年——主要市场",
+    "mkt2.country":"日本","mkt2.desc":"北海道、东北及偏远海岛地区老龄化社区的农村诊所，面临严重的专科医生短缺。","mkt2.timeline":"第2年——扩张",
+    "mkt3.country":"东南亚","mkt3.desc":"菲律宾、印度尼西亚、越南——拥有诊断设备但缺乏专业放射科医生的海岛及农村地区。","mkt3.timeline":"第3-5年——规模化",
+    "qual.title":"为什么选择 Qualcomm + MediEdge","qual.sub":"MediEdge 正是为 Qualcomm 项目所支持的方向而生——具有社会影响力的真实部署级本地AI，而非实验室原型。",
+    "qual1.label":"硬件套件","qual1.desc":"用于临床原型开发的 Dragonwing 开发板和传感器",
+    "qual2.label":"完成奖金","qual2.desc":"在韩国5个以上农村卫生中心进行临床试点部署",
+    "qual3.label":"专利奖励","qual3.desc":"为本地X光AI诊断方法申请知识产权",
+    "qual4.label":"导师指导","qual4.desc":"Qualcomm工程师1对1指导 + 商业培训 + 演示日",
+    "team.eyebrow":"创始人","team.title":"医学与技术的交汇",
+    "team.sub":"MediEdge由一位医学流淌在血液中、技术掌握在手中的人创立。",
+    "t1.role":"创始人兼CEO · MediEdge",
+    "t1.quote":"\"外祖父用草药治愈病人。<br>我用算法治愈病人。\"",
+    "tc1.title":"哈佛大学 — 经济学",
+    "tc1.desc":"扎实的经济学、政策与市场体系分析基础，直接应用于医疗市场缺口分析及MediEdge在韩国、日本和东南亚的市场进入战略。",
+    "tc2.title":"医学世家",
+    "tc2.accent":"外祖父是韩国传统草药医生（한의사）。",
+    "tc2.rest":"3位表兄妹是执业医生。对MediEdge而言，医疗不只是一个市场——这是一份个人使命。",
+    "tc3.title":"深厚的IT与新兴技术经验",
+    "tc3.desc":"横跨AI平台开发、元宇宙基础设施和区块链系统的实战经验，为片上AI架构和临床部署带来全栈技术视角。",
+    "tc4.title":"临床网络与市场准入",
+    "tc4.desc":"通过家族网络直接接触医疗专业人员，已确认2家农村卫生中心试点合作伙伴。深度理解农村诊所的运营、采购和临床决策方式。",
+    "contact.eyebrow":"联系方式","contact.title":"与我们联系",
+    "contact.sub":"有意试用MediEdge、投资或合作？欢迎随时与我们联系。",
+    "contact.website":"mediedge.io — 托管于Vercel",
+    "contact.location":"韩国首尔",
+    "contact.program":"申请中：Qualcomm AI创新者计划2026 — 亚太区",
+    "footer.copy":"© 2026 MediEdge. 面向农村医疗的本地X光AI。",
+    "footer.tag":"为最需要的人提供技术。"
+  },
+  ja: {
+    "nav.problem":"課題","nav.solution":"ソリューション","nav.platform":"プラットフォーム",
+    "nav.market":"市場","nav.team":"チーム","nav.cta":"お問い合わせ",
+    "hero.badge":"Qualcomm Dragonwing搭載 · QAIPI 2026 応募者",
+    "hero.title":"X線AI<br><span class='accent'>オンデバイス。</span><br><span class='accent2'>クラウド不要。即時診断。</span>",
+    "hero.desc":"MediEdgeはQualcommチップ上で直接動作し、インターネット不要で3秒以内に骨折・肺炎を検出します。最も必要としている農村クリニックのために作られました。",
+    "hero.btn1":"仕組みを見る","hero.btn2":"お問い合わせ",
+    "hero.stat1":"AI診断速度","hero.stat2":"骨折検出精度","hero.stat3":"対象農村クリニック",
+    "problem.eyebrow":"課題","problem.title":"農村クリニックにX線装置はある。<br>読影できる医師がいない。",
+    "problem.sub":"アジア太平洋地域全体で、数千のクリニックが医療画像診断装置を保有していますが、結果を解釈できる放射線科医がいません。患者は苦しみ、機器は使われないまま放置されています。",
+    "prob1.title":"専門医不足","prob1.desc":"韓国政府は2026年にMRI専門医要件を緩和しました——農村医療危機が悪化している証拠です。1,500以上のクリニックがX線装置を持ちながら、読影できる人材がいません。",
+    "prob2.title":"2時間以上の待ち時間","prob2.desc":"クラウドベースの読影は1枚約80ドルで2時間以上かかります。救急患者は1〜2時間先の都市病院まで搬送されなければならず、深刻な医療リスクを伴います。",
+    "prob3.title":"クラウドAIは届かない","prob3.desc":"既存のAI放射線プラットフォームは安定したインターネット環境を持つ大型病院を対象としています。接続が不安定な農村や離島のクリニックは完全に取り残されています。",
+    "solution.eyebrow":"ソリューション","solution.title":"オンデバイスX線AI。<br>どこでも動作。",
+    "solution.sub":"MediEdgeはQualcomm Dragonwingチップ上で完全に動作し、インターネット・クラウド・都度課金なしで専門医レベルの骨折検出を提供します。",
+    "step1.title":"患者来院","step1.desc":"患者が農村保健センターを受診。既存の機器で標準的なX線撮影を行います。",
+    "step2.title":"画像転送","step2.desc":"DICOM/JPEG画像をローカルWi-FiまたはUSBでMediEdgeデバイスに送信。インターネット不要。",
+    "step3.title":"⚡ 3秒以内のAI解析","step3.desc":"Qualcomm NPUがデバイス上で画像を処理。骨折部位・信頼度スコア・緊急度が即座に表示されます。",
+    "step4.title":"臨床的判断","step4.desc":"医師や看護師がAI結果を意思決定支援として活用——その場で治療するか、即座に紹介するかを判断。患者データはローカルに保管。",
+    "feat1.title":"100%オンデバイスプライバシー","feat1.desc":"患者データがクリニック外に出ることは一切ありません。設計段階からHIPAA準拠。",
+    "feat2.title":"Qualcomm NPU搭載","feat2.desc":"INT8最適化モデルがDragonwing QRB2210で10W以下で動作。クリニック向け低消費電力。",
+    "feat3.title":"80%コスト削減","feat3.desc":"3,500ドルの一括購入 vs. クラウド読影1枚80ドルの継続費用。6ヶ月以内に投資回収。",
+    "feat4.title":"完全オフライン動作","feat4.desc":"離島クリニック・山村・災害現場——MediEdgeは患者がいる場所ならどこでも動作します。",
+    "feat5.title":"88%以上の検出精度","feat5.desc":"NIH ChestX-ray14とMURAで学習したMobileNetV3モデル。骨折感度92%以上。",
+    "platform.eyebrow":"テクノロジー","platform.title":"Qualcomm Dragonwing基盤",
+    "platform.sub":"専用AI推論＋10W以下の消費電力＋コンパクトなフォームファクターをクリニックが負担できる価格で提供する唯一のエッジプラットフォーム。",
+    "spec.ai":"AIモデル","spec.hw":"Qualcomm Dragonwing QRB2210",
+    "spec.arch":"アーキテクチャ","spec.data":"学習データ","spec.opt":"最適化",
+    "spec.fw":"フレームワーク","spec.acc":"精度","spec.speed":"速度",
+    "spec.power":"消費電力","spec.conn":"接続",
+    "market.eyebrow":"ターゲット市場","market.title":"アジア太平洋農村医療",
+    "market.sub":"韓国の1,500以上の医療資源が乏しい農村クリニックを起点に、5年間でアジア太平洋全域の1,750万ドルの市場に拡大します。",
+    "mkt1.country":"韓国","mkt1.desc":"X線装置はあるが放射線科医がいない農村保健センター。政府のデジタルヘルス補助金が機器費用の50〜80%をカバーします。","mkt1.timeline":"1年目——主要市場",
+    "mkt2.country":"日本","mkt2.desc":"北海道・東北・離島など過疎化が進む地域の農村・人手不足クリニック。専門医不足が深刻。","mkt2.timeline":"2年目——拡大",
+    "mkt3.country":"東南アジア","mkt3.desc":"フィリピン・インドネシア・ベトナム——診断機器はあるが放射線科専門医がいない離島・農村地域。NGOおよび政府病院プログラム。","mkt3.timeline":"3〜5年目——スケール",
+    "qual.title":"なぜQualcomm + MediEdgeなのか","qual.sub":"MediEdgeはQualcommプログラムが支援する方向性——社会的インパクトを持つ現実世界のオンデバイスAI——のために作られています。",
+    "qual1.label":"ハードウェアキット","qual1.desc":"臨床プロトタイプ開発用のDragonwing開発ボード＋センサー",
+    "qual2.label":"完了報奨金","qual2.desc":"韓国の5か所以上の農村保健センターでの臨床パイロット展開",
+    "qual3.label":"特許奨励金","qual3.desc":"オンデバイスX線AI診断手法の知的財産権出願",
+    "qual4.label":"メンタリング","qual4.desc":"Qualcommエンジニアによる1対1指導＋ビジネスコーチング＋デモデイ",
+    "team.eyebrow":"創業者","team.title":"医学とテクノロジーが交わる場所",
+    "team.sub":"MediEdgeは、医学が血に流れ、テクノロジーが手にある人間が作りました。",
+    "t1.role":"創業者 & CEO · MediEdge",
+    "t1.quote":"\"祖父は漢方薬で人を癒しました。<br>私はアルゴリズムで癒します。\"",
+    "tc1.title":"ハーバード大学 — 経済学",
+    "tc1.desc":"経済学・政策・市場システムの分析的基盤。医療市場のギャップ分析と、韓国・日本・東南アジアへの市場参入戦略に直接活用されています。",
+    "tc2.title":"医学の家系",
+    "tc2.accent":"母方の祖父は韓国の伝統漢方医（한의사）でした。",
+    "tc2.rest":"いとこ3人が現役の医師です。MediEdgeにとって医療は単なる市場ではなく、個人的な使命です。",
+    "tc3.title":"ITと先端技術の実践経験",
+    "tc3.desc":"AIプラットフォーム開発・メタバースインフラ・ブロックチェーンシステムにわたる実践経験。オンデバイスAIアーキテクチャと臨床展開にフルスタックの技術視点をもたらします。",
+    "tc4.title":"臨床ネットワークと市場アクセス",
+    "tc4.desc":"家族ネットワークを通じた医療専門家への直接アクセス。農村保健センターのパイロットパートナー2施設を確保済み。農村クリニックの運営・調達・臨床判断の仕組みを深く理解しています。",
+    "contact.eyebrow":"お問い合わせ","contact.title":"ご連絡ください",
+    "contact.sub":"MediEdgeのパイロット導入・投資・協業にご興味がありましたら、ぜひご連絡ください。",
+    "contact.website":"mediedge.io — Vercelにてホスティング",
+    "contact.location":"韓国・ソウル",
+    "contact.program":"応募中：Qualcomm AIイノベータープログラム2026 — APAC",
+    "footer.copy":"© 2026 MediEdge. 農村医療のためのオンデバイスX線AI。",
+    "footer.tag":"最も必要とする人々のための技術。"
+  }
+};
+
+let currentLang = 'en';
+
+function setLang(lang, btn) {
+  currentLang = lang;
+  document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  const t = i18n[lang] || i18n.en;
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (t[key] !== undefined) el.textContent = t[key];
+  });
+  document.querySelectorAll('[data-i18n-html]').forEach(el => {
+    const key = el.getAttribute('data-i18n-html');
+    if (t[key] !== undefined) el.innerHTML = t[key];
+  });
+  // accent spans inside founder cards
+  const accentEl = document.querySelector('[data-i18n="tc2.accent"]');
+  const restEl   = document.querySelector('[data-i18n="tc2.rest"]');
+  if (accentEl && t["tc2.accent"]) accentEl.textContent = t["tc2.accent"];
+  if (restEl   && t["tc2.rest"])   restEl.textContent   = t["tc2.rest"];
+  // quote HTML
+  const quoteEl = document.querySelector('[data-i18n="t1.quote"]');
+  if (quoteEl && t["t1.quote"]) quoteEl.innerHTML = t["t1.quote"];
+}
+
+// Scroll reveal
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.1 });
+document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+
+// Nav shadow on scroll
+window.addEventListener('scroll', () => {
+  document.querySelector('nav').style.boxShadow =
+    window.scrollY > 50 ? '0 4px 30px rgba(0,0,0,0.4)' : 'none';
+});
+</script>
+</body>
+</html>
